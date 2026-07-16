@@ -12,6 +12,8 @@ from db.requests import (
     edit_task,
     get_all_tasks,
     get_all_users,
+    get_task_by_id,
+    get_user_by_id,
     get_user_by_tg_id,
 )
 from keyboards.admin import (
@@ -24,6 +26,7 @@ from keyboards.admin import (
 )
 from middlewares.admin import IsAdmin
 from states.states import AssignTask, CreateTask, DeleteTask, EditTask
+from utils.google_calendar import delete_task_event, sync_task_event
 from utils.text import h
 
 router = Router(name="admin-tasks")
@@ -99,6 +102,19 @@ async def process_assignee(callback: CallbackQuery, state: FSMContext):
         deadline=data.get("deadline"),
     )
     await state.clear()
+
+    if task.deadline:
+        assignee = await get_user_by_id(user_id)
+        assignee_name = assignee.full_name or assignee.username if assignee else None
+        event_id = await sync_task_event(
+            title=task.title,
+            description=task.description,
+            deadline=task.deadline,
+            assignee_name=assignee_name,
+            existing_event_id=None,
+        )
+        if event_id:
+            await edit_task(task.id, calendar_event_id=event_id)
 
     await callback.message.edit_text(f"✅ Task yaratildi: #{task.id} {h(task.title)}")
     await callback.message.answer("Admin menyu:", reply_markup=admin_main_menu())
@@ -209,6 +225,28 @@ async def process_edit_value(message: Message, state: FSMContext):
         value = TaskStatus[value.upper()]
 
     await edit_task(data["task_id"], **{field: value})
+
+    task = await get_task_by_id(data["task_id"])
+    if task:
+        if field == "status" and task.status == TaskStatus.DONE:
+            await delete_task_event(task.calendar_event_id)
+            if task.calendar_event_id:
+                await edit_task(task.id, calendar_event_id=None)
+        elif field in ("title", "description", "deadline") and task.deadline:
+            assignee_name = None
+            if task.assigned_to:
+                assignee = await get_user_by_id(task.assigned_to)
+                assignee_name = assignee.full_name or assignee.username if assignee else None
+            event_id = await sync_task_event(
+                title=task.title,
+                description=task.description,
+                deadline=task.deadline,
+                assignee_name=assignee_name,
+                existing_event_id=task.calendar_event_id,
+            )
+            if event_id != task.calendar_event_id:
+                await edit_task(task.id, calendar_event_id=event_id)
+
     await state.clear()
     await message.answer("✅ Task yangilandi.", reply_markup=admin_main_menu())
 
@@ -242,6 +280,9 @@ async def choose_task_for_delete(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("confirmdelete:"))
 async def confirm_delete(callback: CallbackQuery, state: FSMContext):
     task_id = int(callback.data.split(":")[1])
+    task = await get_task_by_id(task_id)
+    if task and task.calendar_event_id:
+        await delete_task_event(task.calendar_event_id)
     await delete_task(task_id)
     await state.clear()
     await callback.message.edit_text(f"✅ Task #{task_id} o'chirildi.")

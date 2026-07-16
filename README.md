@@ -105,3 +105,49 @@ Ikki yo'l bilan:
 
 `AdminMiddleware` har bir update uchun ikkalasini ham tekshirib, `is_admin`
 flagini handlerlarga uzatadi.
+
+## 📨 Daily Digest (yangilangan)
+
+Endi digestda statistika/raqamlar yo'q. O'rniga har bir user o'ziga quyidagilarni ko'radi:
+- 🎯 **Bugungi rejalar** — deadline'i bugun bo'lgan tasklar
+- 📋 **Sizning faol tasklaringiz** — barcha NEW/IN_PROGRESS tasklar
+- 👥 **Jamoangiz nima ish qilyapti** — o'z teamidagi boshqa a'zolarning faol tasklari
+
+(Ob-havo qismi ilgarigidek qoldi.) Kod: `handlers/admin/digest.py -> build_digest_text(user)`.
+
+## 📅 Google Calendar integratsiyasi
+
+Admin biror taskka deadline qo'ysa (task yaratishda yoki keyin tahrirlashda),
+shu deadline avtomatik umumiy Google Calendar'ga event sifatida yoziladi.
+Task DONE bo'lsa yoki o'chirilsa — event ham kalendardan o'chadi.
+
+Bu bitta umumiy "jamoa kalendari" orqali ishlaydi (Google Service Account),
+ya'ni har bir xodim o'zining shaxsiy Google akkauntini ulashi shart emas —
+faqat bitta kalendar bo'ladi va hammaning tasklari o'sha yerda ko'rinadi.
+
+**Sozlash (bir martalik):**
+1. https://console.cloud.google.com — yangi loyiha oching, **Google Calendar API**ni yoqing.
+2. **IAM & Admin -> Service Accounts** bo'limidan yangi service account yarating,
+   uning uchun JSON kalit yuklab oling (masalan `service_account.json` deb saqlang,
+   `bot/` papkasi ichiga qo'ying — bu fayl `.gitignore`da, hech qachon git'ga tushmaydi).
+3. Google Calendar'da (yangi kalendar ochsangiz ham bo'ladi) **Settings and sharing ->
+   Share with specific people** bo'limidan o'sha service accountning emailini
+   (JSON fayl ichidagi `client_email`, masalan `...@...iam.gserviceaccount.com`)
+   qo'shing va huquq sifatida **"Make changes to events"** bering.
+4. Shu kalendarning **Calendar ID**sini (Settings -> Integrate calendar) oling.
+5. `.env` fayliga qo'shing:
+   ```
+   GOOGLE_CALENDAR_ID=sizning_kalendar_id@group.calendar.google.com
+   GOOGLE_SERVICE_ACCOUNT_FILE=service_account.json
+   ```
+6. Agar bot allaqachon ishlab turgan (eski) bazaga ulanayotgan bo'lsangiz, deploy
+   qilishdan oldin bir marta migratsiyani ishga tushiring (yangi `calendar_event_id`
+   ustunini `tasks` jadvaliga qo'shish uchun):
+   ```
+   cd bot
+   python -m scripts.migrate_add_calendar_column
+   ```
+
+Agar `GOOGLE_CALENDAR_ID` yoki `GOOGLE_SERVICE_ACCOUNT_FILE` bo'sh qoldirilsa,
+kalendar sinxronizatsiyasi shunchaki o'chiq turadi — bot xatosiz, oddiy rejimda
+ishlashda davom etadi (`utils/google_calendar.py`).

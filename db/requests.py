@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, Sequence
 
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.orm import selectinload
 
 from db.database import async_session
 from db.models import Task, TaskStatus, Team, User
@@ -132,6 +133,23 @@ async def get_tasks_by_user(user_id: int) -> Sequence[Task]:
         result = await session.execute(
             select(Task).where(Task.assigned_to == user_id).order_by(Task.created_at.desc())
         )
+        return result.scalars().all()
+
+
+async def get_team_tasks(team_id: int, exclude_user_id: int | None = None) -> Sequence[Task]:
+    """Tasks assigned to members of the given team (based on the assignee's team_id),
+    with the assignee eagerly loaded so it's safe to read after the session closes."""
+    async with async_session() as session:
+        stmt = (
+            select(Task)
+            .join(User, Task.assigned_to == User.id)
+            .where(User.team_id == team_id)
+            .options(selectinload(Task.assignee))
+            .order_by(Task.created_at.desc())
+        )
+        if exclude_user_id is not None:
+            stmt = stmt.where(Task.assigned_to != exclude_user_id)
+        result = await session.execute(stmt)
         return result.scalars().all()
 
 
