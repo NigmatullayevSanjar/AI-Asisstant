@@ -14,6 +14,7 @@ class Config:
     model: str
     google_calendar_id: str
     google_service_account_file: str
+    google_service_account_json: str
 
 
 def load_config() -> Config:
@@ -34,6 +35,7 @@ def load_config() -> Config:
         model=os.getenv("MODEL", "openrouter/free"),
         google_calendar_id=os.getenv("GOOGLE_CALENDAR_ID", ""),
         google_service_account_file=os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", ""),
+        google_service_account_json=os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", ""),
     )
 
 

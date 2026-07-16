@@ -9,19 +9,24 @@ akkauntini ulashi shart emas):
 
 1. https://console.cloud.google.com da yangi loyiha oching, "Google Calendar API"ni yoqing.
 2. "Service Account" yarating -> unga JSON kalit yuklab oling.
-   Shu faylni serverga joylang va yo'lini .env dagi GOOGLE_SERVICE_ACCOUNT_FILE ga yozing.
-   (Masalan: GOOGLE_SERVICE_ACCOUNT_FILE=service_account.json)
 3. Google Calendar'da (yoki yangi kalendar yaratib) uni service account emailiga
    ("...@...iam.gserviceaccount.com", JSON faylning ichida "client_email") ulashing:
    Settings -> Share with specific people -> "Make changes to events".
 4. Kalendar ID'sini (Settings -> Integrate calendar -> Calendar ID) .env dagi
    GOOGLE_CALENDAR_ID ga yozing.
+5. Kalitni ikki xil usulda berish mumkin:
+   a) Lokal/VPS: JSON faylni serverga joylab, yo'lini GOOGLE_SERVICE_ACCOUNT_FILE ga yozing.
+      (Masalan: GOOGLE_SERVICE_ACCOUNT_FILE=service_account.json)
+   b) Railway/Render kabi platformalarda (fayl deploy qilinmaydi, git'ga ham tushmaydi):
+      JSON faylning BUTUN mazmunini nusxalab, GOOGLE_SERVICE_ACCOUNT_JSON environment
+      variable'ga joylashtiring. Bu bo'lsa, u ustuvor ishlatiladi.
 
-Agar bu ikkala .env qiymati bo'sh bo'lsa, kalendar sinxronizatsiyasi shunchaki
-o'chiq turadi va bot xatosiz ishlayveradi.
+Agar ikkalasi ham bo'sh bo'lsa, kalendar sinxronizatsiyasi shunchaki o'chiq turadi
+va bot xatosiz ishlayveradi.
 """
 
 import asyncio
+import json
 import logging
 from datetime import datetime, timedelta
 
@@ -33,7 +38,10 @@ TIMEZONE = "Asia/Tashkent"
 DEFAULT_EVENT_MINUTES = 30
 
 _service = None
-_enabled = bool(config.google_calendar_id and config.google_service_account_file)
+_enabled = bool(
+    config.google_calendar_id
+    and (config.google_service_account_json or config.google_service_account_file)
+)
 _init_failed = False
 
 
@@ -52,10 +60,18 @@ def _get_service():
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
 
-        credentials = service_account.Credentials.from_service_account_file(
-            config.google_service_account_file,
-            scopes=["https://www.googleapis.com/auth/calendar"],
-        )
+        scopes = ["https://www.googleapis.com/auth/calendar"]
+
+        if config.google_service_account_json:
+            info = json.loads(config.google_service_account_json)
+            credentials = service_account.Credentials.from_service_account_info(
+                info, scopes=scopes
+            )
+        else:
+            credentials = service_account.Credentials.from_service_account_file(
+                config.google_service_account_file, scopes=scopes
+            )
+
         _service = build("calendar", "v3", credentials=credentials, cache_discovery=False)
         return _service
     except Exception as e:
