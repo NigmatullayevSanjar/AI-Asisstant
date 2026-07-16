@@ -21,6 +21,7 @@ from handlers.user import tasks as user_tasks
 from middlewares.admin import AdminMiddleware
 from utils.scheduler import setup_scheduler
 from handlers.user import ask_ai
+from handlers.user import quick_reminder
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ async def main() -> None:
     dp.include_router(user_profile.router)
     dp.include_router(user_digest.router)
     dp.include_router(ask_ai.router)
+    dp.include_router(quick_reminder.router)
 
     await init_db()
     setup_scheduler(bot)

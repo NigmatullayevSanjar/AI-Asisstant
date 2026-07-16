@@ -40,3 +40,11 @@ def load_config() -> Config:
 
 
 config = load_config()
+
+print(
+    "[DIAGNOSTIKA] Google Calendar sozlamalari: "
+    f"GOOGLE_CALENDAR_ID={'bor' if config.google_calendar_id else 'YOQ'}, "
+    f"GOOGLE_SERVICE_ACCOUNT_JSON uzunligi={len(config.google_service_account_json)} belgi, "
+    f"GOOGLE_SERVICE_ACCOUNT_FILE={config.google_service_account_file!r}",
+    flush=True,
+)
